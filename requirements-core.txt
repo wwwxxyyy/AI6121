@@ -1,0 +1,8 @@
+# Python 3.11, tested on macOS ARM64. Optional rembg is not needed by the CLI.
+numpy==1.26.4
+scipy==1.15.1
+opencv-python==4.11.0.86
+matplotlib==3.8.4
+tqdm==4.67.1
+pytest==8.3.5
+plotly==7.1.0

@@ -5,7 +5,6 @@ os.environ.setdefault("MPLBACKEND", "Agg")
 
 import cv2
 import numpy as np
-import open3d as o3d
 import scipy
 
 from bundle_adjustment import BAConfig, BundleAdjuster
@@ -20,7 +19,6 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_core_imports_and_sift() -> None:
     assert tuple(map(int, cv2.__version__.split(".")[:2])) >= (4, 10)
     assert scipy.__version__
-    assert o3d.__version__
     assert cv2.SIFT_create().descriptorSize() == 128
     assert BAConfig and BundleAdjuster and Reconstruction and ReconstructionCfg
 

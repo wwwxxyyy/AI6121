@@ -20,6 +20,8 @@ class MatchConfig:
     min_inliers: int = 15
     use_flann: bool = True      # Use FLANN for faster matching
     nfeatures: int = 0          # Add this line
+    num_threads: int = 4
+    mutual_check: bool = False
 
 
 class FeatureMatcher:
@@ -63,14 +65,22 @@ class FeatureMatcher:
         logger.info(f"Extracted features from {len(self.images)} images.")
 
     def _match_pair(self, i: int, j: int) -> Tuple[Tuple[int, int], List[cv2.DMatch]]:
+        if self.des[i] is None or self.des[j] is None or len(self.des[i]) == 0 or len(self.des[j]) < 2:
+            return (i, j), []
         raw = self.matcher.knnMatch(self.des[i], self.des[j], k=2)
-        good = [m for m, n in raw if m.distance < self.cfg.ratio_thresh * n.distance]
+        good = [pair[0] for pair in raw if len(pair) == 2
+                and pair[0].distance < self.cfg.ratio_thresh * pair[1].distance]
+        if self.cfg.mutual_check:
+            backward = self.matcher.knnMatch(self.des[j], self.des[i], k=2)
+            reverse = {pair[0].queryIdx: pair[0].trainIdx for pair in backward
+                       if len(pair) == 2 and pair[0].distance < self.cfg.ratio_thresh * pair[1].distance}
+            good = [m for m in good if reverse.get(m.trainIdx) == m.queryIdx]
         return (i, j), good
 
     def match_pairs(self) -> None:
         logger.info("Matching feature pairs...")
         futures = []
-        with ThreadPoolExecutor() as executor:
+        with ThreadPoolExecutor(max_workers=self.cfg.num_threads) as executor:
             for i in range(self.n_imgs):
                 for j in range(i + 1, self.n_imgs):
                     futures.append(executor.submit(self._match_pair, i, j))
@@ -103,6 +113,7 @@ class FeatureMatcher:
 
     def build_adjacency(self) -> List[Tuple[int, int]]:
         logger.info("Building adjacency graph...")
+        self.adjacency.fill(0)
         pairs = []
         for (i, j), mlist in self.matches.items():
             if len(mlist) >= self.cfg.min_inliers:

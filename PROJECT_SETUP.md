@@ -1,5 +1,7 @@
 # AI6121 SfM 项目环境与工作流
 
+> 当前基础函数版视频入口见 [BASIC_SFM_GUIDE_ZH.md](BASIC_SFM_GUIDE_ZH.md)，使用 Python 3.11 和 `requirements-core.txt`。下文保留原 Notebook/可选基准工作流；新的 `run_sfm.py` 不调用这些外部重建后端。
+
 本目录以 `zaarAli/i-sfm` 为唯一主代码库。原上游已经配置为 Git remote
 `upstream`；数学模块、评估逻辑和流程参考代码放在 `references/`，不会混入主线提交。
 

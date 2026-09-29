@@ -41,6 +41,8 @@ class BundleAdjuster:
         self.n_cams = n_cameras
         self.n_pts = n_points
         self.config = config
+        self.result = None
+        self._observation_groups = [np.flatnonzero(self.cam_idx == i) for i in range(n_cameras)]
 
         # initialize parameter vector: [rvecs,tvecs,pts3d]
         cam_params = []
@@ -71,13 +73,16 @@ class BundleAdjuster:
         cam_params = params[:self.n_cams*6].reshape(self.n_cams, 6)
         pts3d = params[self.n_cams*6:].reshape(self.n_pts, 3)
         proj = np.zeros((self.cam_idx.size, 2))
-        for i in range(self.cam_idx.size):
-            cam = cam_params[self.cam_idx[i]]
+        # One OpenCV call per camera, rather than one call per observation.
+        for camera_id, indices in enumerate(self._observation_groups):
+            if not len(indices):
+                continue
+            cam = cam_params[camera_id]
             rvec = cam[:3]
             tvec = cam[3:].reshape(3,1)
-            X = pts3d[self.pt_idx[i]].reshape(1,3)
+            X = pts3d[self.pt_idx[indices]]
             p, _ = cv2.projectPoints(X, rvec, tvec, self.K, distCoeffs=None)
-            proj[i] = p.ravel()
+            proj[indices] = p.reshape(-1, 2)
         return proj
 
     def residuals(self, params: np.ndarray) -> np.ndarray:
@@ -99,6 +104,7 @@ class BundleAdjuster:
             max_nfev=self.config.max_nfev,
             method=self.config.method
         )
+        self.result = res
         p = res.x[:self.n_cams*6].reshape(self.n_cams, 6)
         pts = res.x[self.n_cams*6:].reshape(self.n_pts, 3)
         rvecs_opt = {i: p[i,:3] for i in range(self.n_cams)}
@@ -112,7 +118,7 @@ class BundleAdjuster:
         If no params are provided, uses the optimized parameters.
         """
         if params is None:
-            params = self.x0  # Use initial guess if not optimized yet
+            params = self.result.x if self.result is not None else self.x0
 
         proj = self._project(params)
         errors = np.linalg.norm(proj - self.pts2d, axis=1)

@@ -1,47 +1,30 @@
 #!/usr/bin/env python3
-"""Remove black-background artifacts and statistical outliers from a colored PLY."""
-
+"""Optional RGB and explicit nearest-neighbor distance filtering of a PLY."""
 import argparse
 from pathlib import Path
-
+import sys
 import numpy as np
-import open3d as o3d
+from scipy.spatial import cKDTree
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from ply_io import read_ply, write_ply
 
 
-def main() -> None:
+def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("input", type=Path)
-    parser.add_argument("output", type=Path)
-    parser.add_argument("--min-color", type=float, default=0.06, help="Minimum max RGB value, in [0, 1]")
-    parser.add_argument("--neighbors", type=int, default=30)
-    parser.add_argument("--std-ratio", type=float, default=1.75)
+    parser.add_argument('input', type=Path); parser.add_argument('output', type=Path)
+    parser.add_argument('--min-color', type=float, default=.06)
+    parser.add_argument('--neighbors', type=int, default=30)
+    parser.add_argument('--std-ratio', type=float, default=1.75)
     args = parser.parse_args()
-
-    cloud = o3d.io.read_point_cloud(str(args.input))
-    points = np.asarray(cloud.points)
-    if len(points) == 0:
-        raise SystemExit(f"No points found in: {args.input}")
-
-    finite = np.isfinite(points).all(axis=1)
-    if cloud.has_colors():
-        colors = np.asarray(cloud.colors)
-        finite &= np.max(colors, axis=1) >= args.min_color
-    cloud = cloud.select_by_index(np.flatnonzero(finite))
-    color_filtered_count = len(cloud.points)
-
-    cloud, _ = cloud.remove_statistical_outlier(
-        nb_neighbors=args.neighbors,
-        std_ratio=args.std_ratio,
-    )
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    if not o3d.io.write_point_cloud(str(args.output), cloud):
-        raise SystemExit(f"Failed to write: {args.output}")
-
-    print(f"Input points:          {len(points)}")
-    print(f"After color filtering: {color_filtered_count}")
-    print(f"After outlier removal: {len(cloud.points)}")
-    print(f"Clean point cloud:     {args.output}")
+    xyz,rgb = read_ply(args.input)
+    keep = np.isfinite(xyz).all(axis=1) & (rgb.max(axis=1)>=args.min_color)
+    xyz,rgb = xyz[keep],rgb[keep]
+    if len(xyz)>2:
+        d,_ = cKDTree(xyz).query(xyz,k=min(args.neighbors+1,len(xyz)),workers=1)
+        score = d[:,1:].mean(axis=1); keep = score<=score.mean()+args.std_ratio*score.std()
+        xyz,rgb = xyz[keep],rgb[keep]
+    write_ply(args.output,xyz,rgb)
+    print(f'Wrote {len(xyz)} points: {args.output}')
 
 
-if __name__ == "__main__":
-    main()
+if __name__=='__main__': main()

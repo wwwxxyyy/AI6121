@@ -28,3 +28,7 @@ datasets/scene_c/*
 # Reference repositories are reproducibly fetched by scripts/fetch_references.sh
 references/*
 !references/README.md
+
+# Local basic-SfM environment and user-provided test videos
+.venv/
+test_video/

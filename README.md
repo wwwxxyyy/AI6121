@@ -1,5 +1,38 @@
 # Structure-from-Motion (SfM) Project Report
 
+## Basic-function video SfM
+
+The current video pipeline is implemented in this repository using OpenCV
+geometric primitives and NumPy/SciPy numerical operations. Track construction,
+incremental registration, multi-view triangulation, and Schur-LM bundle
+adjustment are project-owned; the CLI does not call COLMAP, PyCOLMAP, Ceres,
+OpenMVG, GTSAM, or Open3D.
+
+- [Implementation and reproducible commands (中文)](BASIC_SFM_GUIDE_ZH.md)
+- [Recorded validation results and limitations (中文)](BASIC_SFM_RESULTS_ZH.md)
+
+```bash
+python3.11 -m venv .venv
+.venv/bin/python -m pip install -r requirements-core.txt
+.venv/bin/python -m pytest -q
+.venv/bin/python run_sfm.py --images datasets/templeRing --max-frames 8 --output outputs/temple_basic
+# Supply your own video. By default, every 2 fps sample is retained.
+.venv/bin/python run_sfm.py --video path/to/video.mp4 --refine-focal --output outputs/video_basic
+```
+
+Video acceptance requires every sampled frame to have real observations in the
+final BA, plus depth, parallax, reprojection, and adjacent-view checks. Results
+include colored PLY, headless previews, camera poses, observations and JSON logs.
+An optional OpenCV SGBM stage creates multi-view-checked stereo points after
+independent verification. Estimated intrinsics do not provide metric scale.
+
+Generated outputs, local videos and environments are excluded from Git. The
+notebook report and optional benchmark setup below describe the older workflow;
+they are not prerequisites for this CLI.
+
+## Original project report
+
+
 > **AI6121 local setup:** see [PROJECT_SETUP.md](PROJECT_SETUP.md) for the
 > reproducible Python 3.10 environment, Scene A/B/C layout, reference repositories,
 > smoke test, and CUDA COLMAP benchmark workflow.

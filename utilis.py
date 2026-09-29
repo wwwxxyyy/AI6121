@@ -3,7 +3,6 @@ import os
 import numpy as np
 import cv2
 from pathlib import Path
-import open3d as o3d
 from tqdm.notebook import tqdm
 import matplotlib.pyplot as plt
 from typing import List, Dict, Tuple, Optional
@@ -43,31 +42,13 @@ def load_calibration_matrix(path):
         raise
 
 def display_saved_reconstruction(ply_path):
-    """
-    Load and visualize a saved 3D reconstruction from a .ply file using Open3D with a black background.
-    
-    Args:
-        ply_path (str or Path): Path to the saved PLY file containing the reconstruction.
-    """
-    ply_path = Path(ply_path)
-    if not ply_path.exists():
-        print(f"[ERROR] PLY file does not exist at: {ply_path}")
-        return
-
-    print(f"[INFO] Loading reconstruction from: {ply_path}")
-    pcd = o3d.io.read_point_cloud(str(ply_path))
-    if pcd.is_empty():
-        print(f"[WARNING] Loaded point cloud is empty.")
-        return
-
-    print(f"[INFO] Visualizing {len(pcd.points)} 3D points with black background")
-
-    vis = o3d.visualization.Visualizer()
-    vis.create_window(window_name='Reconstruction', width=1280, height=720)
-    vis.get_render_option().background_color = [0, 0, 0]
-    vis.add_geometry(pcd)
-    vis.run()
-    vis.destroy_window()
+    from ply_io import read_ply
+    xyz, rgb = read_ply(ply_path)
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection="3d")
+    ax.scatter(*xyz.T, c=rgb, s=1)
+    ax.set_box_aspect(np.maximum(np.ptp(xyz, axis=0), 1e-9))
+    plt.show()
 
 
 def visualize_current_state(recon, title="Current State", pause=False):

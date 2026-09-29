@@ -9,7 +9,9 @@ os.environ.setdefault("MPLBACKEND", "Agg")
 
 import matplotlib.pyplot as plt
 import numpy as np
-import open3d as o3d
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from ply_io import read_ply, write_ply, fuse_points
 
 
 def equalize_axes(axis, x: np.ndarray, y: np.ndarray) -> None:
@@ -26,16 +28,19 @@ def main() -> None:
     parser.add_argument("input", type=Path, help="Input colored PLY point cloud")
     parser.add_argument("output", type=Path, help="Output PNG preview")
     args = parser.parse_args()
+    render_preview(args.input, args.output)
 
-    cloud = o3d.io.read_point_cloud(str(args.input))
-    points = np.asarray(cloud.points)
-    colors = np.asarray(cloud.colors)
+
+def render_preview(input_path: Path, output_path: Path) -> None:
+    points, colors = read_ply(input_path)
     if len(points) == 0:
-        raise SystemExit(f"Point cloud is empty: {args.input}")
+        raise ValueError(f"Point cloud is empty: {input_path}")
 
     finite = np.isfinite(points).all(axis=1)
     points = points[finite]
     colors = colors[finite] if len(colors) == len(finite) else np.ones_like(points)
+    if not len(points):
+        raise ValueError("Point cloud contains no finite points")
 
     center = np.median(points, axis=0)
     centered = points - center
@@ -44,7 +49,9 @@ def main() -> None:
     centered = centered[keep]
     colors = colors[keep]
 
-    _, _, axes = np.linalg.svd(centered, full_matrices=False)
+    # A 3x3 eigendecomposition also supports very small clouds without an NxN allocation.
+    _, eigenvectors = np.linalg.eigh(centered.T @ centered)
+    axes = eigenvectors[:, ::-1].T
     aligned = centered @ axes.T
 
     views = ((0, 1, "Front / principal plane"), (0, 2, "Top / depth"), (1, 2, "Side / depth"))
@@ -65,14 +72,15 @@ def main() -> None:
             spine.set_color("#555555")
 
     figure.suptitle(
-        f"{args.input.name}: {len(centered):,} points (99% inlier view)",
+        f"{input_path.name}: {len(centered):,} points (99% display subset)",
         color="white",
         y=0.98,
     )
     figure.tight_layout(rect=(0, 0, 1, 0.91))
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    figure.savefig(args.output, dpi=180, facecolor=figure.get_facecolor())
-    print(f"Rendered {len(centered)} points to {args.output}")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    figure.savefig(output_path, dpi=180, facecolor=figure.get_facecolor())
+    plt.close(figure)
+    print(f"Rendered {len(centered)} points to {output_path}")
 
 
 if __name__ == "__main__":

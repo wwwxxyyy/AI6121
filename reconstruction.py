@@ -3,8 +3,6 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Tuple, Optional
 import numpy as np
 import cv2
-from scipy.spatial.transform import Rotation as R
-from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -28,6 +26,7 @@ class ReconstructionCfg:
     bundle_every: int = 5  # Less frequent bundle adjustment
     verbose: bool = True
     num_threads: int = 12  # For multithreading
+    optical_flow_fallback: bool = False
 
 class Reconstruction:
     def __init__(
@@ -38,7 +37,9 @@ class Reconstruction:
         cfg: ReconstructionCfg,
         images: List[np.ndarray]
     ):
-        self.keypoints = keypoints
+        # OpenCV returns tuples in some builds; recovered optical-flow observations
+        # need append/rollback without mutating the caller's original SIFT collection.
+        self.keypoints = [list(view) for view in keypoints]
         self.matches = matches
         self.adjacency = img_adjacency
         self.cfg = cfg
@@ -48,6 +49,8 @@ class Reconstruction:
         self.placed: List[int] = []
         self.unplaced: List[int] = list(range(img_adjacency.shape[0]))
         self.failed_attempts: Dict[int, int] = {}
+        self.registration_failures: Dict[int, int] = {}
+        self.registration_methods: Dict[int, str] = {}
         self.add_count = 0
 
     def select_baseline(self, top_percent: float = 0.3,
@@ -97,9 +100,9 @@ class Reconstruction:
                 method=cv2.FM_RANSAC,
                 threshold=self.cfg.essential_ransac_thresh
             )
-            if mask is None or mask.sum() < self.cfg.min_inliers_baseline:
+            if E is None or E.shape != (3, 3) or mask is None or np.count_nonzero(mask) < self.cfg.min_inliers_baseline:
                 continue
-            _, R, t, out_mask = cv2.recoverPose(E, pts_i, pts_j, self.cfg.K)
+            _, R, t, out_mask = cv2.recoverPose(E, pts_i, pts_j, self.cfg.K, mask=mask.copy())
             parallax = compute_parallax(pts_i, pts_j, self.cfg.K, R, t, out_mask)
             parallax_deg = np.degrees(parallax)
     
@@ -109,6 +112,8 @@ class Reconstruction:
                 continue
     
             inlier_count = int(np.count_nonzero(out_mask))
+            if inlier_count < self.cfg.min_inliers_baseline:
+                continue
             scores.append(((i, j), len(mlist), inlier_count, parallax_deg))
     
         if not scores:
@@ -126,271 +131,278 @@ class Reconstruction:
         i, j = baseline
         pts_i, pts_j, idxs_i, idxs_j = self._aligned_points(i, j, return_idxs=True)
         E, mask = cv2.findEssentialMat(
-            pts_i, pts_j, self.cfg.K,
-            method=cv2.FM_RANSAC,
-            threshold=self.cfg.essential_ransac_thresh
+            pts_i, pts_j, self.cfg.K, method=cv2.RANSAC,
+            threshold=self.cfg.essential_ransac_thresh,
         )
-        if mask is None or mask.sum() < 15:
-            raise ValueError("Baseline failed due to insufficient inliers")
-        _, R, t, pose_mask = cv2.recoverPose(E, pts_i, pts_j, self.cfg.K)
+        minimum = max(8, self.cfg.min_inliers_baseline)
+        if E is None or E.shape != (3, 3) or mask is None or np.count_nonzero(mask) < minimum:
+            raise ValueError("Baseline failed due to insufficient essential-matrix inliers")
+        _, rotation, translation, pose_mask = cv2.recoverPose(
+            E, pts_i, pts_j, self.cfg.K, mask=mask.copy()
+        )
         inliers = pose_mask.ravel().astype(bool)
-        if inliers.sum() < 15:
+        if inliers.sum() < minimum:
             raise ValueError("Pose recovery failed with low inliers")
         self.poses[i] = (np.eye(3), np.zeros((3, 1)))
-        self.poses[j] = (R, t)
-        idxs_i = np.array(idxs_i)[inliers]
-        idxs_j = np.array(idxs_j)[inliers]
-        self._triangulate_and_add(i, j, idxs_i, idxs_j)
+        self.poses[j] = (rotation, translation)
+        try:
+            self._triangulate_and_add(i, j, idxs_i[inliers], idxs_j[inliers])
+        except Exception:
+            self.poses.pop(i, None)
+            self.poses.pop(j, None)
+            raise
         self.placed = [i, j]
-        self.unplaced.remove(i)
-        self.unplaced.remove(j)
-        logger.info("Initialized reconstruction with baseline image pair.")
+        self.registration_methods.update({i: "essential", j: "essential"})
+        self.unplaced = [k for k in self.unplaced if k not in self.placed]
+        logger.info("Initialized baseline %s with %d points", baseline, len(self.points3d))
 
     def grow(self, bundle_adjust_fn=None, pbar=None):
-        last_pose_count = len(self.poses)
+        # A failed candidate must not prevent other views from adding new tracks.
+        # Low-correspondence views remain pending and are reconsidered after growth.
         while self.unplaced:
-            valid_unplaced = [
-                u for u in self.unplaced
-                if self.failed_attempts.get(u, 0) < self.cfg.max_failed_attempts
-            ]
-            if not valid_unplaced:
-                logger.warning("All unplaced images have exceeded failure limit.")
+            candidates = sorted(
+                ((i, self._count_correspondences(i)) for i in self.unplaced
+                 if self.failed_attempts.get(i, 0) < self.cfg.max_failed_attempts),
+                key=lambda item: (-item[1], item[0]),
+            )
+            eligible = [(i, count) for i, count in candidates
+                        if count >= self.cfg.min_pnp_correspondences
+                        or (self.cfg.optical_flow_fallback and any(abs(p-i) <= 2 for p in self.placed))]
+            if not eligible:
+                logger.info("No remaining view has enough unique 2D/3D correspondences")
                 break
-            try:
-                best_img, best_corr = max(
-                    ((u, self._count_correspondences(u)) for u in valid_unplaced),
-                    key=lambda x: x[1]
-                )
-            except ValueError:
-                logger.warning("No valid images with correspondences.")
-                break
-            if best_corr < self.cfg.min_pnp_correspondences:
-                logger.warning(f"Image {best_img} has only {best_corr} correspondence(s); skipping.")
-                self.unplaced.remove(best_img)
-                continue
-            success = False
-            try:
-                self._add_image(best_img)
-                success = True
+            added = False
+            for img_idx, count in eligible:
+                try:
+                    self._add_image(img_idx)
+                except (ValueError, RuntimeError, cv2.error) as exc:
+                    self.failed_attempts[img_idx] = self.failed_attempts.get(img_idx, 0) + 1
+                    self.registration_failures[img_idx] = self.registration_failures.get(img_idx, 0) + 1
+                    logger.warning("Registration %d failed (%d/%d): %s", img_idx,
+                                   self.failed_attempts[img_idx], self.cfg.max_failed_attempts, exc)
+                    continue
+                added = True
                 self.add_count += 1
-                if pbar:
+                # Newly registered views add tracks and change the PnP problem.
+                # A failure against an older map must not permanently exclude a frame.
+                self.failed_attempts.clear()
+                if pbar is not None:
                     pbar.update(1)
+                # BA errors are pipeline errors, not failed camera registrations.
                 if bundle_adjust_fn and self.add_count % self.cfg.bundle_every == 0:
                     bundle_adjust_fn()
-                if best_img in self.failed_attempts:
-                    del self.failed_attempts[best_img]
-            except Exception as e:
-                logger.error(f"Failed to add image {best_img}: {str(e)}")
-                self.failed_attempts[best_img] = self.failed_attempts.get(best_img, 0) + 1
-                if self.failed_attempts[best_img] >= self.cfg.max_failed_attempts:
-                    logger.warning(f"Permanently removing image {best_img}")
-                    self.unplaced.remove(best_img)
-            if len(self.poses) == last_pose_count:
-                logger.warning("No progress made in this iteration. Stopping to prevent infinite loop.")
                 break
-            last_pose_count = len(self.poses)
+            if not added:
+                logger.info("No view registered in this pass; retrying within the configured limit")
+
+    def _correspondences(self, img_idx):
+        # Index observations instead of scanning every match for every 3D point.
+        observed = {(cam, key): point_id for point_id, pt in enumerate(self.points3d)
+                    for cam, key in pt.observations.items()}
+        candidates = []
+        for placed in self.placed:
+            for m in self.matches.get(tuple(sorted((placed, img_idx))), []):
+                q, t = (m.queryIdx, m.trainIdx) if placed < img_idx else (m.trainIdx, m.queryIdx)
+                point_id = observed.get((placed, q))
+                if point_id is not None and 0 <= t < len(self.keypoints[img_idx]):
+                    candidates.append((m.distance, point_id, t))
+        # A point or keypoint contributes at most once to PnP.
+        seen_points, seen_keys, result = set(), set(), []
+        for _, point_id, key in sorted(candidates):
+            if point_id not in seen_points and key not in seen_keys:
+                result.append((point_id, key))
+                seen_points.add(point_id)
+                seen_keys.add(key)
+        return result
 
     def _count_correspondences(self, img_idx: int) -> int:
-        count = 0
-        for pt in self.points3d:
-            for p in self.placed:
-                pair = tuple(sorted((p, img_idx)))
-                if pair not in self.matches:
-                    continue
-                matches = self.matches[pair]
-                for m in matches:
-                    q, t = (m.queryIdx, m.trainIdx) if p < img_idx else (m.trainIdx, m.queryIdx)
-                    if q < len(self.keypoints[p]) and t < len(self.keypoints[img_idx]):
-                        if pt.observations.get(p) == q:
-                            count += 1
-                            break
-        return count
+        return len(self._correspondences(img_idx))
+
+    def _flow_correspondences(self, img_idx):
+        """Track existing map observations into a weak SIFT frame; do not assign a pose."""
+        neighbors = sorted((p for p in self.placed if abs(p-img_idx) <= 2),
+                           key=lambda p: (abs(p-img_idx), p))[:2]
+        target = self.images[img_idx]
+        target = cv2.cvtColor(target, cv2.COLOR_BGR2GRAY) if target.ndim == 3 else target
+        height, width = target.shape
+        options = dict(winSize=(21, 21), maxLevel=3,
+                       criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 30, .01))
+        candidates = []
+        for source_id in neighbors:
+            observed = [(i, pt.observations[source_id]) for i, pt in enumerate(self.points3d)
+                        if source_id in pt.observations]
+            if not observed:
+                continue
+            source = self.images[source_id]
+            source = cv2.cvtColor(source, cv2.COLOR_BGR2GRAY) if source.ndim == 3 else source
+            original = np.asarray([self.keypoints[source_id][key].pt for _, key in observed],
+                                  dtype=np.float32).reshape(-1, 1, 2)
+            tracked, status, error = cv2.calcOpticalFlowPyrLK(source, target, original, None, **options)
+            if tracked is None:
+                continue
+            xy = tracked.reshape(-1, 2)
+            valid = (status.ravel().astype(bool) & np.isfinite(xy).all(axis=1)
+                     & (error.ravel() < 20) & (xy[:, 0] >= 0) & (xy[:, 0] < width)
+                     & (xy[:, 1] >= 0) & (xy[:, 1] < height))
+            selected = np.flatnonzero(valid)
+            if not len(selected):
+                continue
+            back, back_status, _ = cv2.calcOpticalFlowPyrLK(target, source, tracked[selected], None, **options)
+            if back is None:
+                continue
+            fb_error = np.linalg.norm(back.reshape(-1, 2) - original[selected, 0], axis=1)
+            for local in np.flatnonzero(back_status.ravel().astype(bool) & (fb_error < 1.0)):
+                index = selected[local]
+                candidates.append((float(fb_error[local]), observed[index][0], xy[index]))
+        used_points, used_pixels, result = set(), set(), []
+        for _, point_id, pixel in sorted(candidates, key=lambda c: c[0]):
+            cell = tuple(np.rint(pixel).astype(int))
+            if point_id not in used_points and cell not in used_pixels:
+                result.append((point_id, pixel.astype(np.float64)))
+                used_points.add(point_id)
+                used_pixels.add(cell)
+        return result
 
     def _add_image(self, img_idx: int, pbar=None) -> None:
-        pts3d, pts2d, pt_objs = [], [], []
-        for pt3d in self.points3d:
-            for p in self.placed:
-                pair = tuple(sorted((p, img_idx)))
-                if pair not in self.matches:
-                    continue
-                matches = self.matches[pair]
-                for m in matches:
-                    q, t = (m.queryIdx, m.trainIdx) if p < img_idx else (m.trainIdx, m.queryIdx)
-                    if q < len(self.keypoints[p]) and t < len(self.keypoints[img_idx]):
-                        if pt3d.observations.get(p) == q:
-                            pts3d.append(pt3d.coords)
-                            pts2d.append(self.keypoints[img_idx][t].pt)
-                            pt_objs.append((pt3d, t))
-                            break
+        correspondences = self._correspondences(img_idx)
+        minimum = max(4, self.cfg.min_pnp_correspondences)
+        pixels = np.asarray([self.keypoints[img_idx][k].pt for _, k in correspondences], dtype=np.float64).reshape(-1, 2)
 
-        if len(pts3d) < self.cfg.min_pnp_correspondences:
-            candidates = sorted(
-                [(p, len(self.matches.get(tuple(sorted((p, img_idx))), []))) for p in self.placed],
-                key=lambda x: x[1], reverse=True
-            )
-            if not candidates:
-                raise ValueError("No placed image has matches with this one")
-            best_p, _ = candidates[0]
-            R_bp, t_bp = self.poses[best_p]
-            if np.linalg.norm(t_bp) < 1e-6 and len(self.placed) > 2:
-                raise ValueError("Neighbor has invalid identity pose")
-            raw_matches = self.matches.get(tuple(sorted((best_p, img_idx))), [])
-            match_list = [
-                m for m in raw_matches
-                if m.queryIdx < len(self.keypoints[best_p]) and
-                m.trainIdx < len(self.keypoints[img_idx])
-            ]
-            if len(match_list) >= 8:
-                idxs_p = [m.queryIdx if best_p < img_idx else m.trainIdx for m in match_list]
-                idxs_n = [m.trainIdx if best_p < img_idx else m.queryIdx for m in match_list]
-                self._triangulate_and_add(best_p, img_idx, idxs_p, idxs_n)
-                R_rel = np.eye(3)
-                t_rel = np.array([[0.1], [0], [0]])
-                R_abs = R_rel @ self.poses[best_p][0]
-                t_abs = self.poses[best_p][1] + self.poses[best_p][0] @ t_rel
-                self.poses[img_idx] = (R_abs, t_abs)
-                self.placed.append(img_idx)
-                self.unplaced.remove(img_idx)
-                logger.info(f"Added {img_idx} via fallback with {len(match_list)} matches")
-                if pbar:
-                    pbar.update(1)
-                return
-
-        if len(pts3d) >= self.cfg.min_pnp_correspondences:
-            success, rvec, tvec, inliers = cv2.solvePnPRansac(
-                np.array(pts3d).reshape(-1, 3),
-                np.array(pts2d).reshape(-1, 2),
-                self.cfg.K,
-                distCoeffs=None,
+        def estimate(correspondences, pixels):
+            if len(correspondences) < minimum:
+                return False, None, None, None
+            points = np.asarray([self.points3d[p].coords for p, _ in correspondences], dtype=np.float64)
+            return cv2.solvePnPRansac(
+                points, pixels, self.cfg.K, distCoeffs=None,
                 iterationsCount=self.cfg.pnp_iterations,
-                reprojectionError=self.cfg.pnp_reproj_thresh,
-                flags=self.cfg.pnp_method  # Optimized solver
+                reprojectionError=self.cfg.pnp_reproj_thresh, flags=self.cfg.pnp_method,
             )
-            if success and inliers is not None and len(inliers) >= 4:
-                R, _ = cv2.Rodrigues(rvec)
-                self.poses[img_idx] = (R, tvec.reshape(3, 1))
-                for idx in inliers.ravel():
-                    pt_objs[idx][0].observations[img_idx] = pt_objs[idx][1]
-                self.placed.append(img_idx)
-                self.unplaced.remove(img_idx)
-                logger.info(f"Added image {img_idx} with {len(inliers)} PnP inliers")
-                self._triangulate_new_matches(img_idx)
-                if pbar:
-                    pbar.update(1)
-            else:
-                logger.warning(f"PnP failed for image {img_idx}")
-                raise RuntimeError("PnP failed or insufficient inliers")
-        else:
-            raise ValueError("Insufficient correspondences for PnP")
+
+        success, rvec, tvec, inliers = estimate(correspondences, pixels)
+        use_flow = False
+        if (not success or inliers is None or len(inliers) < minimum) and self.cfg.optical_flow_fallback:
+            tracked = self._flow_correspondences(img_idx)
+            correspondences = [(point_id, None) for point_id, _ in tracked]
+            pixels = np.asarray([pixel for _, pixel in tracked], dtype=np.float64).reshape(-1, 2)
+            success, rvec, tvec, inliers = estimate(correspondences, pixels)
+            use_flow = True
+            if success and inliers is not None:
+                xyz = np.asarray([self.points3d[p].coords for p, _ in correspondences])
+                projection = cv2.projectPoints(xyz, rvec, tvec, self.cfg.K, None)[0].reshape(-1, 2)
+                errors = np.linalg.norm(projection - pixels, axis=1)
+                depth = (xyz @ cv2.Rodrigues(rvec)[0].T + tvec.ravel())[:, 2]
+                ids = inliers.ravel()
+                inliers = ids[(errors[ids] <= self.cfg.pnp_reproj_thresh) & (depth[ids] > 0)].reshape(-1, 1)
+        if not success or inliers is None or len(inliers) < minimum:
+            raise RuntimeError(f"PnP failed: {len(correspondences)} correspondences, "
+                               f"{0 if inliers is None else len(inliers)} inliers, required {minimum}")
+        rotation, _ = cv2.Rodrigues(rvec)
+        if not np.isfinite(rotation).all() or not np.isfinite(tvec).all():
+            raise RuntimeError("PnP returned a non-finite pose")
+        # Registration is transactional: roll back tracks and points on triangulation failure.
+        point_count = len(self.points3d)
+        keypoint_count = len(self.keypoints[img_idx])
+        self.poses[img_idx] = (rotation, tvec.reshape(3, 1))
+        updated = []
+        try:
+            for idx in inliers.ravel():
+                point_id, key = correspondences[idx]
+                if use_flow:
+                    x, y = pixels[idx]
+                    key = len(self.keypoints[img_idx])
+                    self.keypoints[img_idx].append(cv2.KeyPoint(float(x), float(y), 1.0))
+                pt = self.points3d[point_id]
+                updated.append((pt, pt.observations.get(img_idx)))
+                pt.observations[img_idx] = key
+            self._triangulate_new_matches(img_idx)
+        except Exception:
+            del self.points3d[point_count:]
+            del self.keypoints[img_idx][keypoint_count:]
+            self.poses.pop(img_idx, None)
+            for pt, previous in updated:
+                if previous is None:
+                    pt.observations.pop(img_idx, None)
+                else:
+                    pt.observations[img_idx] = previous
+            raise
+        self.placed.append(img_idx)
+        self.registration_methods[img_idx] = "pnp_optical_flow" if use_flow else "pnp_sift"
+        self.unplaced.remove(img_idx)
+        logger.info("Added image %d with %d PnP inliers; %d total points",
+                    img_idx, len(inliers), len(self.points3d))
+        if use_flow:
+            logger.info("Image %d recovered using forward/backward optical flow and validated PnP", img_idx)
+        if pbar is not None:
+            pbar.update(1)
 
     def _aligned_points(self, i: int, j: int, return_idxs: bool = False):
-        mlist = self.matches.get(tuple(sorted((i, j))), [])
-        pts_i = np.array([self.keypoints[i][m.queryIdx].pt for m in mlist], dtype=np.float32)
-        pts_j = np.array([self.keypoints[j][m.trainIdx].pt for m in mlist], dtype=np.float32)
-        if return_idxs:
-            idxs_i = np.array([m.queryIdx for m in mlist])
-            idxs_j = np.array([m.trainIdx for m in mlist])
-            return pts_i, pts_j, idxs_i, idxs_j
-        return pts_i, pts_j
+        matches = self.matches.get(tuple(sorted((i, j))), [])
+        idx_i = np.asarray([m.queryIdx if i < j else m.trainIdx for m in matches], dtype=int)
+        idx_j = np.asarray([m.trainIdx if i < j else m.queryIdx for m in matches], dtype=int)
+        pts_i = np.asarray([self.keypoints[i][k].pt for k in idx_i], dtype=np.float32).reshape(-1, 2)
+        pts_j = np.asarray([self.keypoints[j][k].pt for k in idx_j], dtype=np.float32).reshape(-1, 2)
+        return (pts_i, pts_j, idx_i, idx_j) if return_idxs else (pts_i, pts_j)
 
-    def _process_pair(self, p: int, img_idx: int, P_i: np.ndarray, img_n: np.ndarray) -> List[Point3DView]:
-        R_j, t_j = self.poses[p]
-        P_j = self.cfg.K @ np.hstack((R_j, t_j))
-        pair = tuple(sorted((p, img_idx)))
-        matches = self.matches.get(pair, [])
-        idxs_p, idxs_n = [], []
-        for m in matches:
+    def _triangulate(self, i, j, idx_i, idx_j):
+        if not len(idx_i):
+            return []
+        Ri, ti = self.poses[i]
+        Rj, tj = self.poses[j]
+        Pi = self.cfg.K @ np.hstack((Ri, ti))
+        Pj = self.cfg.K @ np.hstack((Rj, tj))
+        pixels_i = np.asarray([self.keypoints[i][k].pt for k in idx_i], dtype=np.float64)
+        pixels_j = np.asarray([self.keypoints[j][k].pt for k in idx_j], dtype=np.float64)
+        homogeneous = cv2.triangulatePoints(Pi, Pj, pixels_i.T, pixels_j.T).T
+        valid = np.isfinite(homogeneous).all(axis=1) & (np.abs(homogeneous[:, 3]) > 1e-10)
+        points = np.full((len(idx_i), 3), np.nan)
+        points[valid] = homogeneous[valid, :3] / homogeneous[valid, 3:4]
+        camera_i = points @ Ri.T + ti.ravel()
+        camera_j = points @ Rj.T + tj.ravel()
+        valid &= np.isfinite(points).all(axis=1) & (camera_i[:, 2] > 1e-6) & (camera_j[:, 2] > 1e-6)
+        for camera, pixels in ((camera_i, pixels_i), (camera_j, pixels_j)):
+            projected = camera @ self.cfg.K.T
+            with np.errstate(divide='ignore', invalid='ignore'):
+                errors = np.linalg.norm(projected[:, :2] / projected[:, 2:3] - pixels, axis=1)
+            valid &= np.isfinite(errors) & (errors <= self.cfg.pnp_reproj_thresh)
+        result = []
+        used_i, used_j = set(), set()
+        for k in np.flatnonzero(valid):
+            if idx_i[k] in used_i or idx_j[k] in used_j:
+                continue
+            colors = []
+            for cam, key in ((i, idx_i[k]), (j, idx_j[k])):
+                img = self.images[cam]
+                x, y = np.rint(self.keypoints[cam][key].pt).astype(int)
+                x, y = np.clip(x, 0, img.shape[1]-1), np.clip(y, 0, img.shape[0]-1)
+                color = img[y, x]
+                colors.append(np.repeat(color, 3) if np.ndim(color) == 0 else color[:3][::-1])
+            # Convert before adding: uint8 + uint8 wraps around at 255.
+            rgb = tuple(np.rint(np.mean(np.asarray(colors, dtype=np.float64), axis=0)).astype(int))
+            result.append(Point3DView(points[k], rgb, {i: int(idx_i[k]), j: int(idx_j[k])}))
+            used_i.add(idx_i[k])
+            used_j.add(idx_j[k])
+        return result
+
+    def _process_pair(self, p, img_idx, P_i=None, img_n=None):
+        observed = {(cam, key) for pt in self.points3d for cam, key in pt.observations.items()}
+        idx_p, idx_n = [], []
+        for m in self.matches.get(tuple(sorted((p, img_idx))), []):
             q, t = (m.queryIdx, m.trainIdx) if p < img_idx else (m.trainIdx, m.queryIdx)
-            if q < len(self.keypoints[p]) and t < len(self.keypoints[img_idx]):
-                has_observation = False
-                for pt3d in self.points3d:
-                    if pt3d.observations.get(p) == q or pt3d.observations.get(img_idx) == t:
-                        has_observation = True
-                        break
-                if not has_observation:
-                    idxs_p.append(q)
-                    idxs_n.append(t)
-        if len(idxs_p) < 4:
-            return []
-        pts_p = np.array([self.keypoints[p][i].pt for i in idxs_p], dtype=np.float64).T.reshape(2, -1)
-        pts_n = np.array([self.keypoints[img_idx][i].pt for i in idxs_n], dtype=np.float64).T.reshape(2, -1)
-        pts4d = cv2.triangulatePoints(P_j, P_i, pts_p, pts_n)
-        pts3d = cv2.convertPointsFromHomogeneous(pts4d.T).squeeze()
-        depths = pts3d[:, 2]
-        valid = depths > 0.1
-        if valid.sum() < 2:
-            return []
-        img_p = self.images[p]
-        new_points = []
-        for k in range(len(valid)):
-            if not valid[k]:
-                continue
-            coords = pts3d[k]
-            x_p, y_p = map(int, self.keypoints[p][idxs_p[k]].pt)
-            x_n, y_n = map(int, self.keypoints[img_idx][idxs_n[k]].pt)
-            rgb_p = tuple(reversed(img_p[y_p, x_p]))
-            rgb_n = tuple(reversed(img_n[y_n, x_n]))
-            avg_rgb = tuple((np.array(rgb_p) + np.array(rgb_n)) // 2)
-            pt = Point3DView(
-                coords=coords,
-                rgb=avg_rgb,
-                observations={p: idxs_p[k], img_idx: idxs_n[k]}
-            )
-            new_points.append(pt)
-        return new_points
+            if ((p, q) not in observed and (img_idx, t) not in observed
+                    and 0 <= q < len(self.keypoints[p]) and 0 <= t < len(self.keypoints[img_idx])):
+                idx_p.append(q)
+                idx_n.append(t)
+                observed.update(((p, q), (img_idx, t)))
+        return self._triangulate(p, img_idx, idx_p, idx_n)
 
-    def _triangulate_new_matches(self, img_idx: int):
-        logger.debug(f"Triangulating new points for image {img_idx}")
-        R_i, t_i = self.poses[img_idx]
-        P_i = self.cfg.K @ np.hstack((R_i, t_i))
-        img_n = self.images[img_idx]
-        new_points_list = []
-        
-        # Multithreaded triangulation
-        with ThreadPoolExecutor(max_workers=self.cfg.num_threads) as executor:
-            futures = []
-            for p in self.placed:
-                if p != img_idx:
-                    futures.append(executor.submit(self._process_pair, p, img_idx, P_i, img_n))
-            for future in futures:
-                new_points_list.extend(future.result())
+    def _triangulate_new_matches(self, img_idx):
+        # Commit each pair before the next one, so observations cannot be duplicated.
+        for placed in self.placed:
+            if placed != img_idx:
+                self.points3d.extend(self._process_pair(placed, img_idx))
 
-        # Batch update points3d
-        self.points3d.extend(new_points_list)
-        if new_points_list:
-            logger.info(f"Added {len(new_points_list)} new colored 3D points during addition of image {img_idx}")
-        else:
-            logger.warning(f"No new 3D points could be triangulated for image {img_idx}")
-
-    def _triangulate_and_add(self, i: int, j: int, idxs_i: List[int], idxs_j: List[int]) -> None:
-        logger.info(f"Triangulating {len(idxs_i)} points between images {i} and {j}")
-        R_i, t_i = self.poses[i]
-        R_j, t_j = self.poses[j]
-        P_i = self.cfg.K @ np.hstack((R_i, t_i))
-        P_j = self.cfg.K @ np.hstack((R_j, t_j))
-        pts_i = np.array([self.keypoints[i][idx].pt for idx in idxs_i], dtype=np.float64).T.reshape(2, -1)
-        pts_j = np.array([self.keypoints[j][idx].pt for idx in idxs_j], dtype=np.float64).T.reshape(2, -1)
-        pts4d = cv2.triangulatePoints(P_i.astype(np.float64), P_j.astype(np.float64), pts_i, pts_j)
-        pts3d = cv2.convertPointsFromHomogeneous(pts4d.T).squeeze()
-        depths = pts3d[:, 2]
-        valid_mask = depths > 0.1
-        if valid_mask.sum() < 2:
+    def _triangulate_and_add(self, i, j, idxs_i, idxs_j):
+        points = self._triangulate(i, j, idxs_i, idxs_j)
+        if len(points) < 2:
             raise ValueError("Not enough valid 3D points after triangulation")
-        img_i = self.images[i]
-        img_j = self.images[j]
-        for k in range(len(valid_mask)):
-            if not valid_mask[k]:
-                continue
-            coords = pts3d[k]
-            x_i, y_i = map(int, self.keypoints[i][idxs_i[k]].pt)
-            x_j, y_j = map(int, self.keypoints[j][idxs_j[k]].pt)
-            rgb_i = tuple(reversed(img_i[y_i, x_i]))
-            rgb_j = tuple(reversed(img_j[y_j, x_j]))
-            avg_rgb = tuple((np.array(rgb_i) + np.array(rgb_j)) // 2)
-            pt = Point3DView(
-                coords=coords,
-                rgb=avg_rgb,
-                observations={i: idxs_i[k], j: idxs_j[k]}
-            )
-            self.points3d.append(pt)
-        logger.info(f"Successfully added {valid_mask.sum()} new colored 3D points between images {i} and {j}")
+        self.points3d.extend(points)
