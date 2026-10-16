@@ -118,9 +118,8 @@ def run_pipeline(args, output):
     cv2.setRNGSeed(args.seed); cv2.setNumThreads(1); np.random.seed(args.seed)
     images, K, intrinsic_info = prepare_inputs(args, output)
     matcher = FeatureMatcher(len(images), MatchConfig(
-        dataset_path=str(output / "frames"), img_pattern="{idx:04d}.png", ratio_thresh=.75,
-        ransac_thresh=3., min_inliers=20, use_flann=False, nfeatures=args.nfeatures,
-        num_threads=args.threads, mutual_check=True))
+        ratio_thresh=.75, nfeatures=args.nfeatures, num_threads=args.threads,
+        mutual_check=True))
     matcher.images = images
     cache_info = extract_and_match(matcher, args.feature_cache)
     write_json(output / "feature_provenance.json", cache_info)
@@ -139,7 +138,6 @@ def parse_args(argv=None):
                         help="0 (default): retain every sampled frame. Positive N explicitly caps video samples / image count.")
     parser.add_argument("--focal-scale", type=float, default=1.2)
     parser.add_argument("--nfeatures", type=int, default=3000)
-    parser.add_argument("--engine", choices=["basic"], default="basic", help="Project-owned SfM using OpenCV/NumPy/SciPy primitives")
     parser.add_argument("--refine-focal", action="store_true", help="Estimate a common focal from image-pair F matrices, then refine in project-owned BA")
     parser.add_argument("--feature-cache", type=Path, help="Optional pixel/settings-bound cache of our SIFT/BF matches; never camera poses or 3D points")
     parser.add_argument("--ba-iterations", "--ba-max-nfev", dest="ba_max_nfev", type=int, default=100, help="Maximum residual evaluations (also iteration cap) of project-owned block LM per BA call")

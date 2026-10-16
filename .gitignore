@@ -1,9 +1,7 @@
-# Local environments, Python and test caches
+# Local environments and Python caches
 .venv/
 __pycache__/
 *.py[cod]
-.pytest_cache/
-.coverage
 
 # Editors and OS
 .vscode/

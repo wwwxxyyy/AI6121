@@ -1,6 +1,5 @@
 """Incremental SfM implemented explicitly from OpenCV geometric primitives."""
 import logging
-import time
 from itertools import combinations
 import cv2
 import numpy as np

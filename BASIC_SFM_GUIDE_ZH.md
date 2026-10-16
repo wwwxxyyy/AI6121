@@ -57,7 +57,7 @@ export OPENBLAS_NUM_THREADS=1
 .venv/bin/python scripts/render_cloud_views.py outputs/garden --title 'Yunnan Garden' --stereo
 ```
 
-`make demos` 将上述稀疏重建、独立检查、立体点云与渲染串起来。无纹理、反光、遮挡区域可能留洞；立体点云与稀疏 SIFT 点云是不同产物。稀疏点的重投影误差不证明立体点云的真实三维精度。
+`make test`（或 `make demos`）将上述稀疏重建、独立检查、立体点云与渲染串起来，每次为两段视频创建新的 `outputs/video_tests_*/` 目录。无纹理、反光、遮挡区域可能留洞；立体点云与稀疏 SIFT 点云是不同产物。稀疏点的重投影误差不证明立体点云的真实三维精度。
 
 ## 验收、测试与文件
 
@@ -67,4 +67,4 @@ export OPENBLAS_NUM_THREADS=1
 
 核心输出：`reconstruction.ply`、`preview.png`、`cameras.json`、`observations.json`、`frame_usage.json`、`ba_history.json`、`quality.json`、`metrics.json`、内参、抽帧及 `run.log`。立体阶段额外生成 `stereo_cloud.ply`、`stereo_metrics.json` 和 `stereo_views.png`。本地完整运行保存在忽略的 `outputs/`，GitHub 演示摘要见 [demos/README.md](demos/README.md)。
 
-`tests/` 使用合成几何、纹理与小型临时文件，检查匹配边界、状态回滚、三角化深度、颜色、BA 雅可比/优化、点云读写、立体匹配和全部 2 fps 抽帧，不依赖旧数据集。
+仓库仅保留两个真实视频作为测试用例，由 `scripts/test_videos.py` 顺序运行；不再包含 pytest、合成测试或旧数据集测试。每次从原视频重新计算 SIFT/BF 匹配、位姿、三维点和 BA，再执行独立检查、立体点云与预览。测试额外要求消防栓 33 帧、花园 61 帧全部参与，以及每次 BA 收敛且不超过 100 次评估。失败会保留日志并返回非零状态，测试摘要写入输出根目录的 `test_results.json`。

@@ -13,13 +13,13 @@ python3.11 -m venv .venv
 .venv/bin/python -m pip install -r requirements-core.txt
 
 # 两个演示：稀疏重建 → 独立检查 → OpenCV 立体点云 → 预览
-make demos
+make test
 
 # 或仅运行基础稀疏重建
 .venv/bin/python run_sfm.py --video demos/hydrant/input.mp4 --fps 2 --max-frames 0 --refine-focal --output outputs/my_hydrant
 ```
 
-`make demo-hydrant` 和 `make demo-garden` 可单独运行。所有输出目录必须新建或为空，已有结果不会被覆盖。环境不在 `.venv` 时使用 `make demos PYTHON=/path/to/python`。
+`make test`（或 `make demos`）只运行这两段真实视频，每次自动创建 `outputs/video_tests_*/`，无需 pytest，已有结果不会被覆盖。环境不在 `.venv` 时使用 `make test PYTHON=/path/to/python`。单独运行视频可使用上面的命令行入口和新的输出目录。
 
 ## 两段视频演示
 
@@ -39,11 +39,10 @@ make demos
 - `track_graph.py`、`incremental_sfm.py`：跨帧轨迹、初始化、PnP 注册、DLT 三角化。
 - `sparse_ba.py`：自编稀疏 Schur-LM BA。
 - `basic_backend.py`、`quality_checks.py`、`ply_io.py`：流程编排、质量检查、彩色点云读写。
-- `scripts/`：独立验证、基础立体匹配、点云渲染；`tests/`：相关回归测试。
+- `scripts/`：独立验证、基础立体匹配、点云渲染；`test_videos.py` 串联两个视频测试。
 
 [中文实现与运行说明](BASIC_SFM_GUIDE_ZH.md) 说明算法、参数和验收条件。
 
 ```bash
-.venv/bin/python -m pip install -r requirements-dev.txt
 make test
 ```

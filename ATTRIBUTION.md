@@ -2,7 +2,7 @@
 
 本项目基于 [zaarAli/i-sfm](https://github.com/zaarAli/i-sfm) 的教学型增量 SfM 实现继续开发，由 [yitong0322/AI6121](https://github.com/yitong0322/AI6121) 的初始项目导入版本延续而来。
 
-`matching.py` 保留并修改了 i-sfm 的特征提取与匹配实现，增加空描述子/不足近邻处理、双向一致性匹配、邻接图维护和可配置线程。本项目新增了视频入口、跨帧轨迹管理、增量注册与回滚、多视图三角化、自编 Schur-LM Bundle Adjustment、质量检查及两个视频演示。不能将本仓库全部代码视为从零编写。
+`matching.py` 保留并修改了 i-sfm 的特征提取与匹配实现，增加空描述子/不足近邻处理、双向一致性匹配和可配置线程。本项目新增了视频入口、跨帧轨迹管理、增量注册与回滚、多视图三角化、自编 Schur-LM Bundle Adjustment、质量检查及两个视频演示。不能将本仓库全部代码视为从零编写。
 
 原项目采用 MIT License；其版权声明 `Copyright (c) 2025 Zaar Ali` 和完整许可文本保留于 [LICENSE](LICENSE)。
 
