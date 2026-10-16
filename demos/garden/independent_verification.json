@@ -1,0 +1,619 @@
+{
+  "all_frames_verified": true,
+  "sampled_frames": 61,
+  "registered_frames": 61,
+  "points": 4199,
+  "observations": 15532,
+  "min_final_ba_observations": 99,
+  "mean_reprojection_error_px": 0.46547174058774854,
+  "mean_track_length": 3.6989759466539653,
+  "two_view_fraction": 0.0,
+  "min_triangulation_angle_deg": 1.5011311983399034,
+  "nonpositive_depth_observations": 0,
+  "independent_adjacent_pairs": [
+    {
+      "images": [
+        0,
+        1
+      ],
+      "fresh_F_inliers": 1029,
+      "shared_points": 466,
+      "sampson_median_px": 0.09801430056947673,
+      "passed": true
+    },
+    {
+      "images": [
+        1,
+        2
+      ],
+      "fresh_F_inliers": 438,
+      "shared_points": 483,
+      "sampson_median_px": 0.1488266317372245,
+      "passed": true
+    },
+    {
+      "images": [
+        2,
+        3
+      ],
+      "fresh_F_inliers": 305,
+      "shared_points": 232,
+      "sampson_median_px": 0.17804419783234807,
+      "passed": true
+    },
+    {
+      "images": [
+        3,
+        4
+      ],
+      "fresh_F_inliers": 195,
+      "shared_points": 140,
+      "sampson_median_px": 0.17761159990085118,
+      "passed": true
+    },
+    {
+      "images": [
+        4,
+        5
+      ],
+      "fresh_F_inliers": 174,
+      "shared_points": 68,
+      "sampson_median_px": 0.16471598445647617,
+      "passed": true
+    },
+    {
+      "images": [
+        5,
+        6
+      ],
+      "fresh_F_inliers": 100,
+      "shared_points": 43,
+      "sampson_median_px": 0.192151978360699,
+      "passed": true
+    },
+    {
+      "images": [
+        6,
+        7
+      ],
+      "fresh_F_inliers": 232,
+      "shared_points": 99,
+      "sampson_median_px": 0.2255697050505045,
+      "passed": true
+    },
+    {
+      "images": [
+        7,
+        8
+      ],
+      "fresh_F_inliers": 252,
+      "shared_points": 132,
+      "sampson_median_px": 0.18397706397763358,
+      "passed": true
+    },
+    {
+      "images": [
+        8,
+        9
+      ],
+      "fresh_F_inliers": 173,
+      "shared_points": 146,
+      "sampson_median_px": 0.2243876230520483,
+      "passed": true
+    },
+    {
+      "images": [
+        9,
+        10
+      ],
+      "fresh_F_inliers": 253,
+      "shared_points": 162,
+      "sampson_median_px": 0.1799259573033981,
+      "passed": true
+    },
+    {
+      "images": [
+        10,
+        11
+      ],
+      "fresh_F_inliers": 232,
+      "shared_points": 137,
+      "sampson_median_px": 0.18672419806991902,
+      "passed": true
+    },
+    {
+      "images": [
+        11,
+        12
+      ],
+      "fresh_F_inliers": 159,
+      "shared_points": 107,
+      "sampson_median_px": 0.2037497523788953,
+      "passed": true
+    },
+    {
+      "images": [
+        12,
+        13
+      ],
+      "fresh_F_inliers": 347,
+      "shared_points": 221,
+      "sampson_median_px": 0.15789665092089675,
+      "passed": true
+    },
+    {
+      "images": [
+        13,
+        14
+      ],
+      "fresh_F_inliers": 278,
+      "shared_points": 219,
+      "sampson_median_px": 0.15882762302714537,
+      "passed": true
+    },
+    {
+      "images": [
+        14,
+        15
+      ],
+      "fresh_F_inliers": 265,
+      "shared_points": 167,
+      "sampson_median_px": 0.1778071226209571,
+      "passed": true
+    },
+    {
+      "images": [
+        15,
+        16
+      ],
+      "fresh_F_inliers": 232,
+      "shared_points": 144,
+      "sampson_median_px": 0.17952786940265855,
+      "passed": true
+    },
+    {
+      "images": [
+        16,
+        17
+      ],
+      "fresh_F_inliers": 261,
+      "shared_points": 144,
+      "sampson_median_px": 0.2129529680092583,
+      "passed": true
+    },
+    {
+      "images": [
+        17,
+        18
+      ],
+      "fresh_F_inliers": 224,
+      "shared_points": 137,
+      "sampson_median_px": 0.208786709938179,
+      "passed": true
+    },
+    {
+      "images": [
+        18,
+        19
+      ],
+      "fresh_F_inliers": 306,
+      "shared_points": 169,
+      "sampson_median_px": 0.17194515383610035,
+      "passed": true
+    },
+    {
+      "images": [
+        19,
+        20
+      ],
+      "fresh_F_inliers": 275,
+      "shared_points": 168,
+      "sampson_median_px": 0.20777130079155548,
+      "passed": true
+    },
+    {
+      "images": [
+        20,
+        21
+      ],
+      "fresh_F_inliers": 288,
+      "shared_points": 144,
+      "sampson_median_px": 0.21732359501224807,
+      "passed": true
+    },
+    {
+      "images": [
+        21,
+        22
+      ],
+      "fresh_F_inliers": 241,
+      "shared_points": 150,
+      "sampson_median_px": 0.2543053095579414,
+      "passed": true
+    },
+    {
+      "images": [
+        22,
+        23
+      ],
+      "fresh_F_inliers": 266,
+      "shared_points": 127,
+      "sampson_median_px": 0.1924186070957729,
+      "passed": true
+    },
+    {
+      "images": [
+        23,
+        24
+      ],
+      "fresh_F_inliers": 239,
+      "shared_points": 139,
+      "sampson_median_px": 0.23281231463014587,
+      "passed": true
+    },
+    {
+      "images": [
+        24,
+        25
+      ],
+      "fresh_F_inliers": 430,
+      "shared_points": 212,
+      "sampson_median_px": 0.19853433894212452,
+      "passed": true
+    },
+    {
+      "images": [
+        25,
+        26
+      ],
+      "fresh_F_inliers": 354,
+      "shared_points": 199,
+      "sampson_median_px": 0.18544536228796316,
+      "passed": true
+    },
+    {
+      "images": [
+        26,
+        27
+      ],
+      "fresh_F_inliers": 331,
+      "shared_points": 169,
+      "sampson_median_px": 0.20258055887614898,
+      "passed": true
+    },
+    {
+      "images": [
+        27,
+        28
+      ],
+      "fresh_F_inliers": 294,
+      "shared_points": 163,
+      "sampson_median_px": 0.19920563320600174,
+      "passed": true
+    },
+    {
+      "images": [
+        28,
+        29
+      ],
+      "fresh_F_inliers": 345,
+      "shared_points": 173,
+      "sampson_median_px": 0.22128313092261395,
+      "passed": true
+    },
+    {
+      "images": [
+        29,
+        30
+      ],
+      "fresh_F_inliers": 278,
+      "shared_points": 192,
+      "sampson_median_px": 0.2121288592631687,
+      "passed": true
+    },
+    {
+      "images": [
+        30,
+        31
+      ],
+      "fresh_F_inliers": 465,
+      "shared_points": 303,
+      "sampson_median_px": 0.22898528944637955,
+      "passed": true
+    },
+    {
+      "images": [
+        31,
+        32
+      ],
+      "fresh_F_inliers": 354,
+      "shared_points": 308,
+      "sampson_median_px": 0.24068322403375347,
+      "passed": true
+    },
+    {
+      "images": [
+        32,
+        33
+      ],
+      "fresh_F_inliers": 458,
+      "shared_points": 366,
+      "sampson_median_px": 0.19480738330624225,
+      "passed": true
+    },
+    {
+      "images": [
+        33,
+        34
+      ],
+      "fresh_F_inliers": 495,
+      "shared_points": 316,
+      "sampson_median_px": 0.2022959568846827,
+      "passed": true
+    },
+    {
+      "images": [
+        34,
+        35
+      ],
+      "fresh_F_inliers": 294,
+      "shared_points": 232,
+      "sampson_median_px": 0.176107065432939,
+      "passed": true
+    },
+    {
+      "images": [
+        35,
+        36
+      ],
+      "fresh_F_inliers": 285,
+      "shared_points": 191,
+      "sampson_median_px": 0.2579600537755864,
+      "passed": true
+    },
+    {
+      "images": [
+        36,
+        37
+      ],
+      "fresh_F_inliers": 267,
+      "shared_points": 170,
+      "sampson_median_px": 0.23404220591775632,
+      "passed": true
+    },
+    {
+      "images": [
+        37,
+        38
+      ],
+      "fresh_F_inliers": 308,
+      "shared_points": 184,
+      "sampson_median_px": 0.2630727316586886,
+      "passed": true
+    },
+    {
+      "images": [
+        38,
+        39
+      ],
+      "fresh_F_inliers": 313,
+      "shared_points": 196,
+      "sampson_median_px": 0.2263981872821833,
+      "passed": true
+    },
+    {
+      "images": [
+        39,
+        40
+      ],
+      "fresh_F_inliers": 242,
+      "shared_points": 191,
+      "sampson_median_px": 0.24550703509424082,
+      "passed": true
+    },
+    {
+      "images": [
+        40,
+        41
+      ],
+      "fresh_F_inliers": 303,
+      "shared_points": 199,
+      "sampson_median_px": 0.21621290096182988,
+      "passed": true
+    },
+    {
+      "images": [
+        41,
+        42
+      ],
+      "fresh_F_inliers": 296,
+      "shared_points": 217,
+      "sampson_median_px": 0.23977196566583672,
+      "passed": true
+    },
+    {
+      "images": [
+        42,
+        43
+      ],
+      "fresh_F_inliers": 339,
+      "shared_points": 225,
+      "sampson_median_px": 0.22181837556780515,
+      "passed": true
+    },
+    {
+      "images": [
+        43,
+        44
+      ],
+      "fresh_F_inliers": 321,
+      "shared_points": 202,
+      "sampson_median_px": 0.24318297898722768,
+      "passed": true
+    },
+    {
+      "images": [
+        44,
+        45
+      ],
+      "fresh_F_inliers": 295,
+      "shared_points": 205,
+      "sampson_median_px": 0.20520290650867487,
+      "passed": true
+    },
+    {
+      "images": [
+        45,
+        46
+      ],
+      "fresh_F_inliers": 339,
+      "shared_points": 172,
+      "sampson_median_px": 0.2157070680486688,
+      "passed": true
+    },
+    {
+      "images": [
+        46,
+        47
+      ],
+      "fresh_F_inliers": 158,
+      "shared_points": 115,
+      "sampson_median_px": 0.21438778690792618,
+      "passed": true
+    },
+    {
+      "images": [
+        47,
+        48
+      ],
+      "fresh_F_inliers": 275,
+      "shared_points": 135,
+      "sampson_median_px": 0.20602709446714718,
+      "passed": true
+    },
+    {
+      "images": [
+        48,
+        49
+      ],
+      "fresh_F_inliers": 244,
+      "shared_points": 137,
+      "sampson_median_px": 0.20402038268568062,
+      "passed": true
+    },
+    {
+      "images": [
+        49,
+        50
+      ],
+      "fresh_F_inliers": 201,
+      "shared_points": 97,
+      "sampson_median_px": 0.2382388822333317,
+      "passed": true
+    },
+    {
+      "images": [
+        50,
+        51
+      ],
+      "fresh_F_inliers": 251,
+      "shared_points": 91,
+      "sampson_median_px": 0.21676992664913514,
+      "passed": true
+    },
+    {
+      "images": [
+        51,
+        52
+      ],
+      "fresh_F_inliers": 174,
+      "shared_points": 74,
+      "sampson_median_px": 0.19295847670551758,
+      "passed": true
+    },
+    {
+      "images": [
+        52,
+        53
+      ],
+      "fresh_F_inliers": 178,
+      "shared_points": 83,
+      "sampson_median_px": 0.24074376285491755,
+      "passed": true
+    },
+    {
+      "images": [
+        53,
+        54
+      ],
+      "fresh_F_inliers": 200,
+      "shared_points": 99,
+      "sampson_median_px": 0.21071742448139713,
+      "passed": true
+    },
+    {
+      "images": [
+        54,
+        55
+      ],
+      "fresh_F_inliers": 246,
+      "shared_points": 107,
+      "sampson_median_px": 0.21416592894845907,
+      "passed": true
+    },
+    {
+      "images": [
+        55,
+        56
+      ],
+      "fresh_F_inliers": 150,
+      "shared_points": 94,
+      "sampson_median_px": 0.15667151784709252,
+      "passed": true
+    },
+    {
+      "images": [
+        56,
+        57
+      ],
+      "fresh_F_inliers": 182,
+      "shared_points": 80,
+      "sampson_median_px": 0.1668526817478031,
+      "passed": true
+    },
+    {
+      "images": [
+        57,
+        58
+      ],
+      "fresh_F_inliers": 159,
+      "shared_points": 62,
+      "sampson_median_px": 0.1964894708775049,
+      "passed": true
+    },
+    {
+      "images": [
+        58,
+        59
+      ],
+      "fresh_F_inliers": 96,
+      "shared_points": 52,
+      "sampson_median_px": 0.30416871180167204,
+      "passed": true
+    },
+    {
+      "images": [
+        59,
+        60
+      ],
+      "fresh_F_inliers": 163,
+      "shared_points": 85,
+      "sampson_median_px": 0.18197034874447468,
+      "passed": true
+    }
+  ],
+  "all_adjacent_pairs_passed": true,
+  "source_unchanged": true,
+  "current_code_matches_run": true,
+  "preview_readable": true
+}

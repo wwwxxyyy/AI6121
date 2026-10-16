@@ -1,17 +1,24 @@
-.PHONY: setup setup-all refs smoke notebook
+PYTHON ?= .venv/bin/python
+export MPLBACKEND = Agg
+export MPLCONFIGDIR ?= /tmp/ai6121-sfm-mpl
+export OPENBLAS_NUM_THREADS = 1
 
-setup:
-	bash scripts/bootstrap.sh
+.PHONY: test demos demo-hydrant demo-garden
 
-setup-all:
-	bash scripts/bootstrap.sh --with-colmap
+test:
+	$(PYTHON) -m pytest -q
 
-refs:
-	bash scripts/fetch_references.sh
+demos: demo-hydrant demo-garden
 
-smoke:
-	conda run --no-capture-output -n ai6121-sfm python -m pytest -q tests/test_environment.py
+# Each target requires a new or empty output directory.
+demo-hydrant:
+	$(PYTHON) run_sfm.py --video demos/hydrant/input.mp4 --fps 2 --max-frames 0 --refine-focal --nfeatures 3000 --output outputs/hydrant
+	$(PYTHON) scripts/verify_reconstruction.py outputs/hydrant
+	$(PYTHON) scripts/stereo_cloud.py outputs/hydrant --rectify-alpha -1 --disparities 224
+	$(PYTHON) scripts/render_cloud_views.py outputs/hydrant --title Hydrant --stereo
 
-notebook:
-	conda run --no-capture-output -n ai6121-sfm jupyter lab main.ipynb
-
+demo-garden:
+	$(PYTHON) run_sfm.py --video demos/garden/input.mp4 --fps 2 --max-frames 0 --refine-focal --nfeatures 6000 --output outputs/garden
+	$(PYTHON) scripts/verify_reconstruction.py outputs/garden
+	$(PYTHON) scripts/stereo_cloud.py outputs/garden
+	$(PYTHON) scripts/render_cloud_views.py outputs/garden --title 'Yunnan Garden' --stereo

@@ -1,0 +1,125 @@
+{
+  "demo": "hydrant",
+  "label": "消防栓",
+  "verified_on": "2026-10-16",
+  "source_video": "input.mp4",
+  "original_filename": "255_1788600394.mp4",
+  "source_sha256": "2eb7295e27fa9effb86a314cc9ffec853cf4d66e6aefe80435a0695f282da2ec",
+  "width": 544,
+  "height": 960,
+  "duration_seconds": 16.366666666666667,
+  "fps": 2,
+  "max_frames": 0,
+  "nfeatures": 3000,
+  "refine_focal": true,
+  "accepted": true,
+  "sampled_frames": 33,
+  "registered_frames": 33,
+  "all_sampled_frames_used_in_final_ba": true,
+  "sparse_points": 1343,
+  "observations": 4778,
+  "final_reprojection_error_px": {
+    "mean": 0.49299665304226126,
+    "median": 0.3693904563002304,
+    "rmse": 0.6542484059023495,
+    "p95": 1.3899502658313025
+  },
+  "ba_runs": 11,
+  "all_ba_runs_converged": true,
+  "max_ba_nfev": 60,
+  "intrinsics": {
+    "source": "estimated",
+    "focal_scale": 1.2,
+    "formula": "fx=fy=focal_scale*max(width,height); cx=width/2; cy=height/2",
+    "K": [
+      [
+        840.0010705309215,
+        0.0,
+        272.0
+      ],
+      [
+        0.0,
+        840.0010705309215,
+        480.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "width": 544,
+    "height": 960,
+    "distortion": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "scale": "arbitrary; no metric scale reference",
+    "initial_K": [
+      [
+        1152.0,
+        0.0,
+        272.0
+      ],
+      [
+        0.0,
+        1152.0,
+        480.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "refined_focal": true,
+    "refinement": "project-owned shared-focal BA"
+  },
+  "independent_check": "independent_verification.json",
+  "sparse_elapsed_seconds_with_feature_cache": 15.606204291805625,
+  "feature_cache_note": "Reused only image/settings/source-hash-bound SIFT/BF features and matches; camera poses, focal and points re-estimated. Clean run without cache also computes features/matches and takes longer.",
+  "stereo_full_points": 287209,
+  "stereo_elapsed_seconds": 6.661069500260055,
+  "stereo_method": "OpenCV SGBM + left/right check <=1px + >=3-view depth consistency at 2%",
+  "stereo_rectification_alpha": -1.0,
+  "stereo_requested_disparities": 224,
+  "stereo_preview_points": 100000,
+  "stereo_preview_sampling": "Uniform selection without replacement from reconstructed stereo points, NumPy default_rng(seed=0); sorted indices. No generated geometry.",
+  "preview_png_source": "Two camera projections of the full stereo cloud, rendered without input photographs. The compact PLY is a subset of that cloud.",
+  "versions": {
+    "numpy": "1.26.4",
+    "scipy": "1.15.1",
+    "opencv-python": "4.11.0.86",
+    "matplotlib": "3.8.4"
+  },
+  "code_sha256": {
+    "run_sfm.py": "72498160fd2d25ac7b60d4df6509bbf13429cb487c7c323e116c76d3dbc63530",
+    "matching.py": "ef2f8e86586df72a88b7a6f8648c19a5021341fb3497a7e90aeeeb4d067121c0",
+    "basic_backend.py": "d3da774459bbe20ab08a26c1807b77407677fb5a8f2bf9184917acbdead72588",
+    "track_graph.py": "f4a3a0294109b4e050ebad05188716c7aad5ebf48c85f6c8d574a4bcbc7c9319",
+    "incremental_sfm.py": "0a32841a98420b2057341648f2c99ab85d2f8b1fb791e37e0ab0b4aa2aa2ba76",
+    "sparse_ba.py": "71ef4783650dab6b7e7edfc27f16bfbf1c3bb51f13973f1067d25a85747cfd3d",
+    "feature_cache.py": "662ac50c7c8018d43b4b35fc09558cc5b75cac413cd33f071d82c39a499009a4",
+    "quality_checks.py": "6d35532ffe0e84c73491eed20a3c3f694a64d477e5057f4d18c499d3a8b5ae48",
+    "ply_io.py": "a45351549735dc24b90a4e8515fcfc581102f39cc4dcc5494778eecf92559a9c",
+    "scripts/render_ply.py": "c1d2759f9f4882d362d5dd6fb9ebfe54ad6aa4cc2a1eb739b210ad641977cda4"
+  },
+  "stereo_script_sha256": "6c5b743fb127f717809696ccecea9d125bdcad11291e88b0fd8965f7cb79b09b",
+  "limitations": [
+    "Estimated pinhole intrinsics, zero distortion",
+    "Arbitrary monocular scale; no ground-truth metric accuracy",
+    "Sparse reprojection error does not measure stereo cloud accuracy"
+  ],
+  "published_artifact_sha256": {
+    "K.txt": "778d4b2e6464c2094cb92050333b8b9f24f03bbff25d47f81220dc1e2852fec2",
+    "cameras.json": "813cc88f05a9559a0ade97f9db31db334f830dc259bf3f2ed13d51faa3e5bc34",
+    "independent_verification.json": "f194e08d42b12acdbaf3301ffebb6847617ef7146a178f966ac10ec6de093f5d",
+    "input.mp4": "2eb7295e27fa9effb86a314cc9ffec853cf4d66e6aefe80435a0695f282da2ec",
+    "preview.png": "03d504c0c6c44c5ad9f95480cd8d004c2d89e9c66afa18b9ee7b76314ecc1679",
+    "reconstruction.ply": "e28cb4c3cb7b6c55ac6d8406cf4ab0f0976c00eb99c942950faca876f90645ca",
+    "stereo_preview.ply": "5f34aaaa828c43f54c903ed360347e1ff7802f83434343de1646b551ef13d0c0"
+  }
+}

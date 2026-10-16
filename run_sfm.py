@@ -17,7 +17,6 @@ import cv2
 import numpy as np
 
 from matching import FeatureMatcher, MatchConfig
-from scripts.render_ply import render_preview
 
 LOG = logging.getLogger("sfm_cli")
 
@@ -111,23 +110,6 @@ def prepare_inputs(args, output):
     write_json(output / "frames.json", records)
     write_json(output / "input.json", metadata)
     return images, K, intrinsic_info
-
-
-def frame_usage(recon, final_ba, camera_ids, errors):
-    """A frame is used only if its real pose has observations in final BA."""
-    normalized = {cam: i for i, cam in enumerate(camera_ids)}
-    usage = []
-    for image_id in range(len(recon.images)):
-        index = normalized.get(image_id)
-        selected = final_ba.cam_idx == index if index is not None else np.zeros(len(errors), dtype=bool)
-        count = int(np.count_nonzero(selected))
-        usage.append({"image_id": image_id, "registered": index is not None,
-                      "registration_method": recon.registration_methods.get(image_id),
-                      "final_ba_observations": count,
-                      "used_in_final_ba": index is not None and count >= recon.cfg.min_pnp_correspondences,
-                      "mean_reprojection_error_px": float(errors[selected].mean()) if count else None,
-                      "registration_attempt_failures": recon.registration_failures.get(image_id, 0)})
-    return usage
 
 
 def run_pipeline(args, output):

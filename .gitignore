@@ -1,34 +1,16 @@
-# Python / Jupyter
+# Local environments, Python and test caches
+.venv/
 __pycache__/
 *.py[cod]
 .pytest_cache/
-.ipynb_checkpoints/
 .coverage
 
-# Editors / OS
+# Editors and OS
 .vscode/
 .idea/
 .DS_Store
 
-# Generated reconstructions and COLMAP workspaces
+# Regenerated outputs; the two published examples live in demos/
 outputs/*
 !outputs/.gitkeep
-colmap-workspaces/
 *.log
-
-# Student-captured datasets (the bundled baseline datasets remain tracked)
-Data/
-datasets/scene_a/*
-datasets/scene_b/*
-datasets/scene_c/*
-!datasets/scene_a/.gitkeep
-!datasets/scene_b/.gitkeep
-!datasets/scene_c/.gitkeep
-
-# Reference repositories are reproducibly fetched by scripts/fetch_references.sh
-references/*
-!references/README.md
-
-# Local basic-SfM environment and user-provided test videos
-.venv/
-test_video/

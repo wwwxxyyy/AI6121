@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from ply_io import read_ply, write_ply, fuse_points
+from ply_io import read_ply
 
 
 def equalize_axes(axis, x: np.ndarray, y: np.ndarray) -> None:

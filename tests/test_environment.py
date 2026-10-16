@@ -1,5 +1,4 @@
 import os
-from pathlib import Path
 
 os.environ.setdefault("MPLBACKEND", "Agg")
 
@@ -7,45 +6,35 @@ import cv2
 import numpy as np
 import scipy
 
-from bundle_adjustment import BAConfig, BundleAdjuster
 from matching import FeatureMatcher, MatchConfig
-from reconstruction import Reconstruction, ReconstructionCfg
-from utilis import load_calibration_matrix
+from incremental_sfm import IncrementalSfM
+from sparse_ba import SparseBundleAdjuster
 
 
-ROOT = Path(__file__).resolve().parents[1]
-
-
-def test_core_imports_and_sift() -> None:
+def test_core_imports_and_sift():
     assert tuple(map(int, cv2.__version__.split(".")[:2])) >= (4, 10)
     assert scipy.__version__
     assert cv2.SIFT_create().descriptorSize() == 128
-    assert BAConfig and BundleAdjuster and Reconstruction and ReconstructionCfg
+    assert IncrementalSfM and SparseBundleAdjuster
 
 
-def test_bundled_calibration_and_dataset_layout() -> None:
-    dataset = ROOT / "datasets" / "templeRing"
-    K = load_calibration_matrix(dataset / "K.txt")
-    assert K.shape == (3, 3)
-    assert np.all(np.diag(K) > 0)
-    assert (dataset / "00.png").is_file()
-    assert (dataset / "01.png").is_file()
-
-
-def test_two_view_feature_matching_smoke() -> None:
-    dataset = ROOT / "datasets" / "templeRing"
+def test_two_view_feature_matching_on_synthetic_texture(tmp_path):
+    """Exercise disk loading, SIFT, matching and geometry without a bundled dataset."""
+    rng = np.random.default_rng(23)
+    image = rng.integers(0, 256, (240, 320), dtype=np.uint8)
+    image = cv2.GaussianBlur(image, (3, 3), .7)
+    transform = np.array([[1., .015, 9.], [-.01, 1., 6.], [.00003, -.00002, 1.]])
+    warped = cv2.warpPerspective(image, transform, (320, 240))
+    for index, pixels in enumerate((image, warped)):
+        assert cv2.imwrite(str(tmp_path / f"{index:02d}.png"), pixels)
     cfg = MatchConfig(
-        dataset_path=str(dataset),
-        img_pattern="{idx:02d}.png",
-        ratio_thresh=0.8,
-        ransac_thresh=3.0,
-        min_inliers=8,
-        use_flann=False,
+        dataset_path=str(tmp_path), img_pattern="{idx:02d}.png", ratio_thresh=.8,
+        ransac_thresh=2., min_inliers=20, use_flann=False, mutual_check=True,
+        nfeatures=500, num_threads=1,
     )
+    cv2.setRNGSeed(0)
     matcher = FeatureMatcher(n_imgs=2, cfg=cfg)
-    connected_pairs = matcher.run()
-    assert len(matcher.kps) == 2
-    assert all(len(keypoints) > 0 for keypoints in matcher.kps)
-    assert matcher.adjacency.shape == (2, 2)
-    assert matcher.adjacency[0, 1] == 1
-    assert (0, 1) in connected_pairs
+    assert matcher.run() == [(0, 1)]
+    assert all(len(keypoints) >= 20 for keypoints in matcher.kps)
+    assert len(matcher.matches[(0, 1)]) >= 20
+    np.testing.assert_array_equal(matcher.adjacency, [[0, 1], [1, 0]])
